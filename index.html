@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Krantenbezorger</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:      #f5f3ee;
+  --ink:     #1a1a18;
+  --mid:     #6b6860;
+  --rule:    #d8d4cc;
+  --white:   #ffffff;
+
+  /* krantkleuren */
+  --c-tt:   #1a5c9e;  /* Tubantia – blauw */
+  --c-st:   #c8281e;  /* Stentor  – rood  */
+  --c-tel:  #0f7a3c;  /* Telegraaf – groen */
+  --c-tr:   #9c3a9c;  /* Trouw    – paars */
+  --c-vk:   #d97020;  /* Volkskrant – oranje */
+
+  --done-bg: #e8ebe4;
+  --done-ink:#9a9890;
+
+  --bar-h: 116px; /* hoogte vaste telbalk */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 15px;
+  min-height: 100dvh;
+}
+
+/* ── VASTE TELBALK BOVENAAN ── */
+#telbalk {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  background: var(--ink);
+  color: var(--white);
+  padding: 10px 12px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+#telbalk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#telbalk-titel {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+
+#gps-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.45);
+}
+#gps-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #666;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+#gps-dot.ok  { background: #6fcf6f; box-shadow: 0 0 5px #6fcf6f; }
+#gps-dot.err { background: #f07070; }
+
+/* Totaalteller */
+#totaal-rij {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#totaal-getal {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 2.4rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--white);
+}
+#totaal-label {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.2;
+}
+
+/* Kranten tellers */
+#krant-tellers {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.krant-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 4px;
+  padding: 3px 8px 3px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  transition: opacity 0.2s;
+  user-select: none;
+}
+.krant-chip.gefilterd { opacity: 0.35; }
+.chip-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chip-getal { color: var(--white); }
+.chip-naam  { color: rgba(255,255,255,0.6); font-size: 0.65rem; }
+
+/* ── TABS ── */
+#tabs {
+  position: fixed;
+  top: var(--bar-h);
+  left: 0; right: 0;
+  z-index: 190;
+  display: flex;
+  background: var(--white);
+  border-bottom: 1.5px solid var(--rule);
+}
+.tab {
+  flex: 1;
+  padding: 9px 4px;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mid);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2.5px solid transparent;
+  transition: all 0.18s;
+}
+.tab.actief { color: var(--ink); border-bottom-color: var(--ink); }
+
+/* ── SCROLLBAAR GEBIED ── */
+.scherm { display: none; padding-top: calc(var(--bar-h) + 41px); padding-bottom: 24px; }
+.scherm.actief { display: block; }
+
+/* ── INVOERSCHERM ── */
+#invoer-scherm { padding-left: 14px; padding-right: 14px; }
+
+.sectie-kop {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mid);
+  padding: 14px 0 8px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 12px;
+}
+
+.invoer-raster {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.invoer-veld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.invoer-veld label {
+  font-size: 0.68rem;
+  color: var(--mid);
+  font-family: 'IBM Plex Mono', monospace;
+}
+.invoer-veld input, .invoer-veld select {
+  background: var(--white);
+  border: 1.5px solid var(--rule);
+  border-radius: 6px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.9rem;
+  padding: 9px 10px;
+  color: var(--ink);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+.invoer-veld input:focus, .invoer-veld select:focus {
+  border-color: var(--ink);
+}
+
+/* Aantal-invoer per krant */
+.krant-invoer-lijst { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.krant-invoer-rij {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--white);
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.krant-invoer-naam {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.krant-kleur-blok {
+  width: 12px; height: 24px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.krant-invoer-naam small { font-size: 0.68rem; color: var(--mid); font-weight: 400; }
+.aantal-control {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.aantal-btn {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  user-select: none;
+}
+.aantal-btn:active { background: var(--rule); }
+.aantal-display {
+  width: 44px;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: none;
+  background: var(--white);
+  color: var(--ink);
+  padding: 0;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.aantal-display::-webkit-outer-spin-button,
+.aantal-display::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+.knop-primair {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: var(--ink);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+  margin-bottom: 10px;
+}
+.knop-primair:active { opacity: 0.75; }
+.knop-reset {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: none;
+  color: var(--mid);
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.knop-reset:active { border-color: var(--ink); }
+
+.melding {
+  text-align: center;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  margin-top: 8px;
+  display: none;
+}
+.melding.ok  { background: #e8f5e8; color: #2a6e2a; display: block; }
+.melding.err { background: #fde8e8; color: #8a2020; display: block; }
+
+/* ── ROUTESCHERM ── */
+#route-scherm { padding-left: 0; padding-right: 0; }
+
+#filter-balk {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--rule);
+  background: var(--white);
+  position: sticky;
+  top: calc(var(--bar-h) + 41px);
+  z-index: 100;
+  scrollbar-width: none;
+}
+#filter-balk::-webkit-scrollbar { display: none; }
+.filter-btn {
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--rule);
+  background: none;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.67rem;
+  color: var(--mid);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.filter-btn.actief { background: var(--ink); color: var(--white); border-color: var(--ink); }
+
+#adres-lijst { padding: 8px 14px 80px; }
+
+.adres-kaart {
+  background: var(--white);
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+}
+.adres-kaart:active { transform: scale(0.985); }
+
+.adres-kaart.dichtst {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+.adres-kaart.dichtst::after {
+  content: '▲ DICHTST';
+  position: absolute;
+  top: 0; right: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  background: var(--ink);
+  color: var(--white);
+  padding: 2px 7px;
+  border-radius: 0 8px 0 6px;
+}
+.adres-kaart.bezorgd {
+  background: var(--done-bg);
+  border-color: transparent;
+}
+.adres-kaart.bezorgd .adres-straat { text-decoration: line-through; color: var(--done-ink); }
+.adres-kaart.bezorgd .adres-meta   { color: var(--done-ink); }
+
+/* Links kleurstrook */
+.kleur-strook {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+/* Vinkje */
+.vink-cirkel {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--rule);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+  transition: all 0.15s;
+  background: var(--white);
+}
+.adres-kaart.bezorgd .vink-cirkel {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--white);
+}
+
+.adres-info { flex: 1; min-width: 0; }
+.adres-straat {
+  font-weight: 600;
+  font-size: 0.93rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adres-meta {
+  font-size: 0.68rem;
+  color: var(--mid);
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.krant-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--white);
+}
+
+.afstand-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--mid);
+  text-align: right;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.leeg-staat {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--mid);
+  font-size: 0.82rem;
+  line-height: 2;
+}
+
+/* GPS ververs knop */
+#wake-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.45);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+}
+#wake-pill.actief { color: #f5c842; }
+
+#gps-knop {
+  position: fixed;
+  bottom: 22px; right: 16px;
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--white);
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.22);
+  z-index: 300;
+  transition: transform 0.15s;
+}
+#gps-knop:active { transform: scale(0.9); }
+#gps-knop.draait { animation: draaien 0.9s linear infinite; }
+@keyframes draaien { to { transform: rotate(360deg); } }
+
+/* Vink-animatie */
+@keyframes vink-in {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.88); }
+  70%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.vink-animatie { animation: vink-in 0.28s ease; }
+
+/* Geen invoer melding */
+#geen-invoer-melding {
+  background: #fff8e8;
+  border: 1.5px solid #f0d080;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: #7a5c10;
+  margin: 10px 14px 0;
+  display: none;
+}
+#geen-invoer-melding.zichtbaar { display: block; }
+</style>
+</head>
+<body>
+
+<!-- VASTE TELBALK -->
+<div id="telbalk">
+  <div id="telbalk-header">
+    <span id="telbalk-titel">Nog te bezorgen</span>
+    <div id="gps-pill"><div id="gps-dot"></div><span id="gps-tekst">GPS…</span></div>
+    <div id="wake-pill" title="Scherm blijft aan">☀ <span id="wake-tekst">scherm…</span></div>
+  </div>
+  <div id="totaal-rij">
+    <div id="totaal-getal">—</div>
+    <div id="totaal-label">kranten<br>in de tas</div>
+  </div>
+  <div id="krant-tellers"></div>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <button class="tab" onclick="naarScherm('invoer')">📋 Invoer</button>
+  <button class="tab actief" onclick="naarScherm('route')">🗺 Route</button>
+</div>
+
+<!-- INVOERSCHERM -->
+<div id="invoer-scherm" class="scherm">
+  <div class="sectie-kop">Aantal kranten vandaag</div>
+  <div class="krant-invoer-lijst" id="krant-invoer-lijst"></div>
+  <button class="knop-primair" onclick="slaInvoerOp()">Ronde starten →</button>
+  <button class="knop-reset" onclick="resetRonde()">Ronde resetten</button>
+  <div class="melding" id="invoer-melding"></div>
+
+  <div class="sectie-kop" style="margin-top:8px">Hoe werkt de app</div>
+  <div style="padding:0 0 16px; color:var(--mid); font-size:0.82rem; line-height:1.7">
+    <p style="margin-bottom:8px">1. Vul hier het <strong style="color:var(--ink)">werkelijke aantal</strong> per kranttype in zoals je het hebt meegekregen van het depot.</p>
+    <p style="margin-bottom:8px">2. Druk op <strong style="color:var(--ink)">Ronde starten</strong> — de tellers bovenaan worden bijgewerkt.</p>
+    <p style="margin-bottom:8px">3. Ga naar <strong style="color:var(--ink)">Route</strong>: het dichtstbijzijnde adres staat altijd bovenaan. Tik op een adres zodra je de krant bezorgd hebt.</p>
+    <p>4. De tellers tellen automatisch af bij elk vinkje.</p>
+  </div>
+</div>
+
+<!-- ROUTESCHERM -->
+<div id="route-scherm" class="scherm actief">
+  <div id="geen-invoer-melding">
+    ⚠ Voer eerst het aantal kranten in via het <strong>Invoer</strong>-scherm.
+  </div>
+  <div id="filter-balk">
+    <button class="filter-btn actief" onclick="setFilter('alles',this)">Alles</button>
+    <button class="filter-btn" onclick="setFilter('todo',this)">Nog te doen</button>
+    <button class="filter-btn" onclick="setFilter('bezorgd',this)">Bezorgd</button>
+  </div>
+  <div id="adres-lijst"></div>
+</div>
+
+<button id="gps-knop" onclick="gpsVerversen()" title="GPS vernieuwen">⟳</button>
+
+<script>
+// ─────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────
+const KRANTEN_DEF = [
+  { code:"TT AT", naam:"Tubantia",    kleur:"var(--c-tt)"  },
+  { code:"ST ZP", naam:"Stentor",     kleur:"var(--c-st)"  },
+  { code:"TEL",   naam:"Telegraaf",   kleur:"var(--c-tel)" },
+  { code:"TR",    naam:"Trouw",       kleur:"var(--c-tr)"  },
+  { code:"VK",    naam:"Volkskrant",  kleur:"var(--c-vk)"  },
+];
+
+const ADRESSEN_STANDAARD = [
+  {id:"1",  straat:"Molenweg",        nr:"2",   pc:"7274 AA", krant:"TT AT"},
+  {id:"2",  straat:"Molenweg",        nr:"6",   pc:"7274 AA", krant:"TR"},
+  {id:"3",  straat:"Molenweg",        nr:"8",   pc:"7274 AA", krant:"ST ZP"},
+  {id:"4",  straat:"Molenweg",        nr:"11a", pc:"7274 AA", krant:"ST ZP"},
+  {id:"5",  straat:"Meiweg",          nr:"2",   pc:"7274 AC", krant:"ST ZP"},
+  {id:"6",  straat:"Meiweg",          nr:"16",  pc:"7274 AC", krant:"TT AT"},
+  {id:"7",  straat:"Meiweg",          nr:"13",  pc:"7274 AC", krant:"TT AT"},
+  {id:"8",  straat:"Meiweg",          nr:"21",  pc:"7274 AC", krant:"ST ZP"},
+  {id:"9",  straat:"Brinkweg",        nr:"2",   pc:"7274 AD", krant:"VK"},
+  {id:"10", straat:"Brinkweg",        nr:"4",   pc:"7274 AD", krant:"VK"},
+  {id:"11", straat:"Brinkweg",        nr:"8",   pc:"7274 AD", krant:"TEL"},
+  {id:"12", straat:"Morsweg",         nr:"7",   pc:"7274 AE", krant:"ST ZP"},
+  {id:"13", straat:"Morsweg",         nr:"23",  pc:"7274 AE", krant:"TT AT"},
+  {id:"14", straat:"Morsweg",         nr:"10",  pc:"7274 AG", krant:"ST ZP"},
+  {id:"15", straat:"Morsweg",         nr:"22",  pc:"7274 AG", krant:"TT AT"},
+  {id:"16", straat:"Morsweg",         nr:"24",  pc:"7274 AG", krant:"TT AT"},
+  {id:"17", straat:"Morsweg",         nr:"28",  pc:"7274 AG", krant:"ST ZP"},
+  {id:"18", straat:"Morsweg",         nr:"32",  pc:"7274 AG", krant:"TT AT"},
+  {id:"19", straat:"Esweg",           nr:"3",   pc:"7274 AK", krant:"TT AT"},
+  {id:"20", straat:"Esweg",           nr:"7",   pc:"7274 AK", krant:"ST ZP"},
+  {id:"21", straat:"Esweg",           nr:"14",  pc:"7274 AK", krant:"VK"},
+  {id:"22", straat:"Esweg",           nr:"16",  pc:"7274 AK", krant:"TT AT"},
+  {id:"23", straat:"Esweg",           nr:"18",  pc:"7274 AK", krant:"ST ZP"},
+  {id:"24", straat:"Hagensweg",       nr:"1",   pc:"7274 AL", krant:"VK"},
+  {id:"25", straat:"Hagensweg",       nr:"10",  pc:"7274 AL", krant:"ST ZP"},
+  {id:"26", straat:"Hagensweg",       nr:"16",  pc:"7274 AL", krant:"ST ZP"},
+  {id:"27", straat:"Dorpsstraat",     nr:"3",   pc:"7274 AM", krant:"TEL"},
+  {id:"28", straat:"Dorpsstraat",     nr:"15",  pc:"7274 AM", krant:"TT AT"},
+  {id:"29", straat:"Dorpsstraat",     nr:"4",   pc:"7274 AN", krant:"TEL"},
+  {id:"30", straat:"Dorpsstraat",     nr:"12",  pc:"7274 AN", krant:"TEL"},
+  {id:"31", straat:"Kerkplein",       nr:"6a",  pc:"7274 AP", krant:"VK"},
+  {id:"32", straat:"Kerkplein",       nr:"18",  pc:"7274 AP", krant:"TT AT"},
+  {id:"33", straat:"Pastorieweg",     nr:"5",   pc:"7274 AR", krant:"TT AT"},
+  {id:"34", straat:"Pastorieweg",     nr:"7a",  pc:"7274 AR", krant:"TR"},
+  {id:"35", straat:"Pastorieweg",     nr:"11",  pc:"7274 AR", krant:"TT AT"},
+  {id:"36", straat:"Pastorieweg",     nr:"13",  pc:"7274 AR", krant:"ST ZP"},
+  {id:"37", straat:"Pastorieweg",     nr:"19",  pc:"7274 AR", krant:"ST ZP"},
+  {id:"38", straat:"Pastorieweg",     nr:"21",  pc:"7274 AR", krant:"TEL"},
+  {id:"39", straat:"Pastorieweg",     nr:"4",   pc:"7274 AS", krant:"TT AT"},
+  {id:"40", straat:"Pastorieweg",     nr:"6",   pc:"7274 AS", krant:"TT AT"},
+  {id:"41", straat:"Keistraat",       nr:"20",  pc:"7274 AW", krant:"TT AT"},
+  {id:"42", straat:"Keistraat",       nr:"27",  pc:"7274 AW", krant:"ST ZP"},
+  {id:"43", straat:"Zonnekamp",       nr:"1a",  pc:"7274 AX", krant:"TT AT"},
+  {id:"44", straat:"Zonnekamp",       nr:"3",   pc:"7274 AX", krant:"TT AT"},
+  {id:"45", straat:"Zonnekamp",       nr:"5",   pc:"7274 AX", krant:"ST ZP"},
+  {id:"46", straat:"Zonnekamp",       nr:"9",   pc:"7274 AX", krant:"TT AT"},
+  {id:"47", straat:"Zonnekamp",       nr:"15",  pc:"7274 AX", krant:"ST ZP"},
+  {id:"48", straat:"Zonnekamp",       nr:"4",   pc:"7274 AX", krant:"ST ZP"},
+  {id:"49", straat:"Zonnekamp",       nr:"10",  pc:"7274 AX", krant:"ST ZP"},
+  {id:"50", straat:"Pellenweversweg", nr:"3",   pc:"7274 AZ", krant:"TT AT"},
+  {id:"51", straat:"Pellenweversweg", nr:"6",   pc:"7274 AZ", krant:"TT AT"},
+  {id:"52", straat:"Den Goarden",     nr:"2",   pc:"7274 BA", krant:"TT AT"},
+  {id:"53", straat:"Den Goarden",     nr:"8",   pc:"7274 BA", krant:"TT AT"},
+  {id:"54", straat:"Den Goarden",     nr:"12",  pc:"7274 BA", krant:"TT AT"},
+  {id:"55", straat:"Den Goarden",     nr:"7",   pc:"7274 BA", krant:"ST ZP"},
+  {id:"56", straat:"Maaldrinkstraat", nr:"1",   pc:"7274 BB", krant:"TT AT"},
+  {id:"57", straat:"Maaldrinkstraat", nr:"8",   pc:"7274 BB", krant:"ST ZP"},
+  {id:"58", straat:"Maaldrinkstraat", nr:"10",  pc:"7274 BB", krant:"ST ZP"},
+  {id:"59", straat:"Maaldrinkstraat", nr:"16",  pc:"7274 BB", krant:"ST ZP"},
+  {id:"60", straat:"Maaldrinkstraat", nr:"18",  pc:"7274 BB", krant:"ST ZP"},
+  {id:"61", straat:"Karssenberg",     nr:"3",   pc:"7274 BC", krant:"ST ZP"},
+  {id:"62", straat:"Karssenberg",     nr:"17",  pc:"7274 BC", krant:"TEL"},
+  {id:"63", straat:"De Bleeke",       nr:"6",   pc:"7274 BD", krant:"ST ZP"},
+  {id:"64", straat:"Het Rosbach",     nr:"13",  pc:"7274 BE", krant:"ST ZP"},
+  {id:"65", straat:"Het Rosbach",     nr:"2",   pc:"7274 BE", krant:"ST ZP"},
+  {id:"66", straat:"Het Rosbach",     nr:"4",   pc:"7274 BE", krant:"TT AT"},
+  {id:"67", straat:"Het Rosbach",     nr:"14",  pc:"7274 BE", krant:"TT AT"},
+  {id:"68", straat:"Het Rosbach",     nr:"18",  pc:"7274 BE", krant:"TT AT"},
+  {id:"69", straat:"Het Rosbach",     nr:"22",  pc:"7274 BE", krant:"TT AT"},
+  {id:"70", straat:"Het Rosbach",     nr:"28",  pc:"7274 BE", krant:"TT AT"},
+];
+
+// ─────────────────────────────────────────────
+//  OPSLAG  (localStorage met fallback)
+// ─────────────────────────────────────────────
+const _geheugen = {};
+function opslagLees(sleutel) {
+  try { return localStorage.getItem(sleutel); } catch(e) { return _geheugen[sleutel] || null; }
+}
+function opslagSchrijf(sleutel, waarde) {
+  try { localStorage.setItem(sleutel, waarde); } catch(e) { _geheugen[sleutel] = waarde; }
+}
+
+function laadState() {
+  const opgeslagen = opslagLees('kb2_state');
+  if (opgeslagen) { try { return JSON.parse(opgeslagen); } catch(e) {} }
+  return {
+    invoerGedaan: false,
+    aantalPerKrant: {},
+    bezorgd: {},
+  };
+}
+function slaState(s) { opslagSchrijf('kb2_state', JSON.stringify(s)); }
+
+let state = laadState();
+let adressen = ADRESSEN_STANDAARD.map(a => ({...a, done: !!state.bezorgd[a.id], lat:null, lng:null}));
+
+// ─────────────────────────────────────────────
+//  GPS
+// ─────────────────────────────────────────────
+let gpsLat = null, gpsLng = null;
+
+// ─────────────────────────────────────────────
+//  WAKE LOCK  (scherm aan houden)
+// ─────────────────────────────────────────────
+let wakeLock = null;
+
+async function schermAanHouden() {
+  const pill = document.getElementById('wake-pill');
+  const tekst = document.getElementById('wake-tekst');
+  if (!('wakeLock' in navigator)) {
+    tekst.textContent = 'n.v.t.';
+    return;
+  }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    pill.classList.add('actief');
+    tekst.textContent = 'aan';
+    wakeLock.addEventListener('release', () => {
+      pill.classList.remove('actief');
+      tekst.textContent = 'uit';
+    });
+  } catch(e) {
+    tekst.textContent = 'geblokkeerd';
+  }
+}
+
+// Heractiveer wake lock als app terugkomt van achtergrond
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && (!wakeLock || wakeLock.released)) {
+    await schermAanHouden();
+  }
+});
+
+function startGPS() {
+  if (!navigator.geolocation) { gpsStatus('err','Geen GPS'); return; }
+  navigator.geolocation.watchPosition(
+    pos => {
+      gpsLat = pos.coords.latitude;
+      gpsLng = pos.coords.longitude;
+      gpsStatus('ok', `±${Math.round(pos.coords.accuracy||0)}m`);
+      tekenRoute();
+    },
+    () => gpsStatus('err','GPS fout'),
+    { enableHighAccuracy:true, maximumAge:12000, timeout:20000 }
+  );
+}
+
+function gpsVerversen() {
+  const k = document.getElementById('gps-knop');
+  k.classList.add('draait');
+  navigator.geolocation?.getCurrentPosition(pos => {
+    gpsLat = pos.coords.latitude; gpsLng = pos.coords.longitude;
+    gpsStatus('ok', `±${Math.round(pos.coords.accuracy||0)}m`);
+    tekenRoute();
+    k.classList.remove('draait');
+  }, () => k.classList.remove('draait'), { enableHighAccuracy:true, timeout:10000 });
+}
+
+function gpsStatus(type, tekst) {
+  document.getElementById('gps-dot').className = type;
+  document.getElementById('gps-tekst').textContent = tekst;
+}
+
+function afstand(lat1,lng1,lat2,lng2) {
+  const R=6371000, dL=(lat2-lat1)*Math.PI/180, dN=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function afstandTekst(m) {
+  if (m==null) return '';
+  return m<1000 ? Math.round(m)+'m' : (m/1000).toFixed(1)+'km';
+}
+
+// ─────────────────────────────────────────────
+//  POSTCODE → COÖRDINATEN  (Nominatim, gecached)
+// ─────────────────────────────────────────────
+let coordCache = {}; try { coordCache = JSON.parse(opslagLees('kb2_coords') || '{}'); } catch(e) {}
+
+async function getCoords(adres) {
+  const key = adres.pc + adres.nr;
+  if (coordCache[key]) { adres.lat=coordCache[key].lat; adres.lng=coordCache[key].lng; return; }
+  try {
+    const q = encodeURIComponent(`${adres.straat} ${adres.nr}, ${adres.pc} Geesteren, Netherlands`);
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
+      { headers:{'User-Agent':'KrantenbezorgerApp/2.0'} });
+    const d = await r.json();
+    if (d.length) {
+      adres.lat = parseFloat(d[0].lat);
+      adres.lng = parseFloat(d[0].lon);
+      coordCache[key] = {lat:adres.lat, lng:adres.lng};
+      opslagSchrijf('kb2_coords', JSON.stringify(coordCache));
+    }
+  } catch(e) {}
+}
+
+async function laadCoords() {
+  // Laad in batches van 3, met pauze (Nominatim limiet)
+  for (let i=0; i<adressen.length; i+=3) {
+    await Promise.all(adressen.slice(i,i+3).map(getCoords));
+    if (i+3 < adressen.length) await new Promise(r=>setTimeout(r,1100));
+    tekenRoute();
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TELBALK
+// ─────────────────────────────────────────────
+function krantDef(code) { return KRANTEN_DEF.find(k=>k.code===code) || {code,naam:code,kleur:'#888'}; }
+
+let filterKrant = null; // null = alles
+
+function tekenTelbalk() {
+  const invoer = state.aantalPerKrant;
+  const bezorgdPerKrant = {};
+  adressen.forEach(a => { if(a.done) bezorgdPerKrant[a.krant] = (bezorgdPerKrant[a.krant]||0)+1; });
+
+  // Totaal resterend = ingevoerd - bezorgd (telt alleen adressen die afgevinkt zijn)
+  let totaalIn = 0, totaalBez = 0;
+  KRANTEN_DEF.forEach(k => {
+    totaalIn  += (invoer[k.code]||0);
+    totaalBez += (bezorgdPerKrant[k.code]||0);
+  });
+  const resterend = state.invoerGedaan ? Math.max(0, totaalIn - totaalBez) : '—';
+  document.getElementById('totaal-getal').textContent = resterend;
+
+  // Chips
+  const container = document.getElementById('krant-tellers');
+  container.innerHTML = '';
+  KRANTEN_DEF.forEach(k => {
+    const ing = invoer[k.code] || 0;
+    if (!ing && !state.invoerGedaan) return; // verberg als nog niet ingevuld
+    const bez = bezorgdPerKrant[k.code] || 0;
+    const rest = Math.max(0, ing - bez);
+    const chip = document.createElement('div');
+    chip.className = 'krant-chip' + (filterKrant && filterKrant!==k.code ? ' gefilterd' : '');
+    chip.innerHTML = `<div class="chip-dot" style="background:${k.kleur}"></div>
+      <span class="chip-getal">${state.invoerGedaan ? rest : '—'}</span>
+      <span class="chip-naam">${k.naam}</span>`;
+    chip.onclick = () => {
+      filterKrant = filterKrant===k.code ? null : k.code;
+      tekenTelbalk(); tekenRoute();
+    };
+    container.appendChild(chip);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  INVOERSCHERM
+// ─────────────────────────────────────────────
+function tekenInvoer() {
+  // Tel het verwacht aantal per krant op basis van adressenlijst
+  const verwacht = {};
+  adressen.forEach(a => { verwacht[a.krant] = (verwacht[a.krant]||0)+1; });
+
+  const lijst = document.getElementById('krant-invoer-lijst');
+  lijst.innerHTML = '';
+  KRANTEN_DEF.forEach(k => {
+    const huidig = state.aantalPerKrant[k.code] ?? verwacht[k.code] ?? 0;
+    const rij = document.createElement('div');
+    rij.className = 'krant-invoer-rij';
+    rij.innerHTML = `
+      <div class="krant-invoer-naam">
+        <div class="krant-kleur-blok" style="background:${k.kleur}"></div>
+        <div>
+          ${k.naam}
+          <br><small>${k.code} · ${verwacht[k.code]||0} adressen</small>
+        </div>
+      </div>
+      <div class="aantal-control">
+        <button class="aantal-btn" onclick="aantalWijzig('${k.code}',-1)">−</button>
+        <input class="aantal-display" type="number" id="inp-${k.code}"
+               value="${huidig}" min="0" max="999"
+               oninput="aantalWijzigDirect('${k.code}',this.value)">
+        <button class="aantal-btn" onclick="aantalWijzig('${k.code}',+1)">+</button>
+      </div>`;
+    lijst.appendChild(rij);
+  });
+}
+
+function aantalWijzig(code, delta) {
+  const inp = document.getElementById('inp-'+code);
+  const nieuw = Math.max(0, (parseInt(inp.value)||0) + delta);
+  inp.value = nieuw;
+}
+function aantalWijzigDirect(code, val) { /* live, opslaan bij submit */ }
+
+function slaInvoerOp() {
+  KRANTEN_DEF.forEach(k => {
+    const inp = document.getElementById('inp-'+k.code);
+    state.aantalPerKrant[k.code] = Math.max(0, parseInt(inp.value)||0);
+  });
+  state.invoerGedaan = true;
+  slaState(state);
+  toonMelding('invoer-melding', 'ok', '✓ Opgeslagen — ga naar Route!');
+  tekenTelbalk();
+  document.getElementById('geen-invoer-melding').classList.remove('zichtbaar');
+}
+
+function resetRonde() {
+  if (!confirm('Ronde resetten? Alle vinkjes worden gewist.')) return;
+  state = { invoerGedaan:false, aantalPerKrant:{}, bezorgd:{} };
+  slaState(state);
+  adressen.forEach(a => { a.done = false; });
+  filterKrant = null;
+  tekenTelbalk(); tekenInvoer(); tekenRoute();
+  document.getElementById('geen-invoer-melding').classList.add('zichtbaar');
+  toonMelding('invoer-melding','ok','Ronde gereset.');
+}
+
+function toonMelding(id, type, tekst) {
+  const el = document.getElementById(id);
+  el.className = 'melding ' + type;
+  el.textContent = tekst;
+  setTimeout(() => el.className='melding', 3500);
+}
+
+// ─────────────────────────────────────────────
+//  ROUTESCHERM
+// ─────────────────────────────────────────────
+let huidigFilter = 'alles';
+
+function setFilter(f, el) {
+  huidigFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('actief'));
+  el.classList.add('actief');
+  tekenRoute();
+}
+
+function tekenRoute() {
+  const container = document.getElementById('adres-lijst');
+
+  // Geen-invoer melding
+  document.getElementById('geen-invoer-melding').classList.toggle('zichtbaar', !state.invoerGedaan);
+
+  // Bereken afstanden
+  let lijst = adressen.map(a => ({
+    ...a,
+    dist: (gpsLat && a.lat) ? afstand(gpsLat, gpsLng, a.lat, a.lng) : null
+  }));
+
+  // Krant-filter (chip-tap)
+  if (filterKrant) lijst = lijst.filter(a => a.krant === filterKrant);
+
+  // Scherm-filter
+  if (huidigFilter==='todo')     lijst = lijst.filter(a=>!a.done);
+  if (huidigFilter==='bezorgd')  lijst = lijst.filter(a=> a.done);
+
+  // Sortering: te bezorgen eerst op afstand, daarna bezorgd onderaan
+  lijst.sort((a,b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (a.dist!==null && b.dist!==null) return a.dist-b.dist;
+    if (a.dist!==null) return -1;
+    if (b.dist!==null) return  1;
+    return 0;
+  });
+
+  if (!lijst.length) {
+    container.innerHTML = '<div class="leeg-staat">Geen adressen gevonden.</div>';
+    return;
+  }
+
+  let eersteNietKlaar = true;
+  container.innerHTML = lijst.map(a => {
+    const kd = krantDef(a.krant);
+    const isDichtst = !a.done && eersteNietKlaar && a.dist !== null;
+    if (!a.done) eersteNietKlaar = false;
+    const distStr = afstandTekst(a.dist);
+    return `<div class="adres-kaart${a.done?' bezorgd':''}${isDichtst?' dichtst':''}"
+                 id="kaart-${a.id}" onclick="toggleBezorgd('${a.id}')">
+      <div class="kleur-strook" style="background:${kd.kleur}"></div>
+      <div class="vink-cirkel">${a.done?'✓':''}</div>
+      <div class="adres-info">
+        <div class="adres-straat">${a.straat} ${a.nr}</div>
+        <div class="adres-meta">${a.pc}${distStr ? ' · '+distStr : ''}</div>
+      </div>
+      <div class="krant-label" style="background:${kd.kleur}">${kd.naam}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBezorgd(id) {
+  const a = adressen.find(x=>x.id===id);
+  if (!a) return;
+  a.done = !a.done;
+  state.bezorgd[id] = a.done;
+  if (!a.done) delete state.bezorgd[id];
+  slaState(state);
+
+  // Animeer vinkje
+  const kaart = document.getElementById('kaart-'+id);
+  if (kaart) kaart.classList.add('vink-animatie');
+  setTimeout(() => { tekenRoute(); tekenTelbalk(); }, 220);
+}
+
+// ─────────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────────
+function naarScherm(naam) {
+  document.querySelectorAll('.scherm').forEach(s=>s.classList.remove('actief'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('actief'));
+  document.getElementById(naam+'-scherm').classList.add('actief');
+  document.querySelectorAll('.tab')[naam==='invoer'?0:1].classList.add('actief');
+  if (naam==='invoer') tekenInvoer();
+}
+
+// ─────────────────────────────────────────────
+//  TELBALK HOOGTE  (dynamisch aanpassen)
+// ─────────────────────────────────────────────
+function herberekenBarHoogte() {
+  const h = document.getElementById('telbalk').offsetHeight;
+  document.documentElement.style.setProperty('--bar-h', h+'px');
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+tekenTelbalk();
+tekenRoute();
+startGPS();
+laadCoords();
+schermAanHouden();
+
+// Herstel melding als nog geen invoer
+if (!state.invoerGedaan) {
+  document.getElementById('geen-invoer-melding').classList.add('zichtbaar');
+}
+
+window.addEventListener('resize', herberekenBarHoogte);
+setTimeout(herberekenBarHoogte, 300);
+</script>
+</body>
+</html>
