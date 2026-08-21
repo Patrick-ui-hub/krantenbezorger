@@ -122,7 +122,7 @@ body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-seri
     <span id="telbalk-titel">Nog te bezorgen</span>
     <div style="display:flex;align-items:center">
       <div id="gps-pill"><div id="gps-dot"></div><span id="gps-tekst">GPS…</span></div>
-      <div id="wake-pill">☀ <span id="wake-tekst">…</span></div>
+      <div id="wake-pill" onclick="schermAanHouden()" title="Tik om scherm aan te houden" style="cursor:pointer">☀ <span id="wake-tekst">…</span></div>
     </div>
   </div>
   <div id="dag-schakelaar">
@@ -418,6 +418,7 @@ function verplaatsAdres(id,richting){
 }
 let dragSrcId=null;
 function dragStart(e,id){dragSrcId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
+function dragEnd(e){document.querySelectorAll('.beheer-item').forEach(el=>{el.style.opacity='1';el.classList.remove('dragover');});}
 function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('dragover');return false;}
 function dragLeave(e){e.currentTarget.classList.remove('dragover');}
 function dragDrop(e,targetId){
@@ -440,7 +441,7 @@ function tekenBeheer(){
     if(!lijst.length){ct.innerHTML='<div style="color:var(--mid);font-size:0.75rem;padding:8px 0">Geen adressen.</div>';return;}
     ct.innerHTML=lijst.map((a,i)=>{
       const kd=krantDef(a.krant),isExtra=extra.find(e=>e.id===a.id);
-      return '<div class="beheer-item" id="bi-'+a.id+'" draggable="true" ondragstart="dragStart(event,\''+a.id+'\')" ondragover="dragOver(event)" ondrop="dragDrop(event,\''+a.id+'\')" ondragleave="dragLeave(event)">'+
+      return '<div class="beheer-item" id="bi-'+a.id+'" draggable="true" ondragstart="dragStart(event,\''+a.id+'\')" ondragover="dragOver(event)" ondrop="dragDrop(event,\''+a.id+'\')" ondragleave="dragLeave(event)" ondragend="dragEnd(event)">'+
         '<span class="beheer-greep" title="Slepen">⠿</span>'+
         '<div class="krant-kleur-blok" style="background:'+kd.kleur+';width:8px;height:36px;border-radius:2px;flex-shrink:0"></div>'+
         '<div class="beheer-item-info"><div class="beheer-item-adres">'+a.straat+' '+a.nr+'</div><div class="beheer-item-meta">'+a.postcode+' · '+kd.naam+(a.notitie?' · 📌':'')+'</div></div>'+
@@ -463,7 +464,14 @@ function voegAdresToe(){
 function verwijderAdres(id){if(!confirm('Dit adres verwijderen?'))return;extra=extra.filter(a=>a.id!==id);slaExtra();delete state.bezorgd[id];slaState(state);tekenBeheer();tekenRoute();tekenTelbalk();}
 let wakeLock=null;
 async function schermAanHouden(){const pill=document.getElementById('wake-pill'),txt=document.getElementById('wake-tekst');if(!('wakeLock'in navigator)){txt.textContent='n.v.t.';return;}try{wakeLock=await navigator.wakeLock.request('screen');pill.classList.add('actief');txt.textContent='aan';wakeLock.addEventListener('release',()=>{pill.classList.remove('actief');txt.textContent='uit';});}catch(e){txt.textContent='geblokkeerd';}}
-document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&(!wakeLock||wakeLock.released))await schermAanHouden();});
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible'){
+    // Wacht even zodat de browser klaar is met terugkomen
+    setTimeout(async()=>{
+      if(!wakeLock||wakeLock.released) await schermAanHouden();
+    }, 300);
+  }
+});
 let actievTab='route';
 function naarScherm(naam){actievTab=naam;document.querySelectorAll('.scherm').forEach(s=>s.classList.remove('actief'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('actief'));document.getElementById(naam+'-scherm').classList.add('actief');document.querySelectorAll('.tab')[{invoer:0,route:1,beheer:2}[naam]].classList.add('actief');if(naam==='invoer')tekenInvoer();if(naam==='beheer')tekenBeheer();}
 function herberekeenBarHoogte(){const h=document.getElementById('telbalk').offsetHeight;document.documentElement.style.setProperty('--bar-h',h+'px');}
