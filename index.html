@@ -94,6 +94,12 @@ body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-seri
 .beheer-item-adres{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .beheer-item-meta{font-size:0.63rem;color:var(--mid);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
 .beheer-verwijder{background:rgba(200,40,30,0.1);color:#c8281e;border:1px solid rgba(200,40,30,0.25);border-radius:5px;padding:3px 8px;font-size:0.68rem;cursor:pointer;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+.beheer-greep{font-size:1rem;color:var(--mid);cursor:grab;padding:0 4px;flex-shrink:0;touch-action:none;user-select:none;}
+.beheer-greep:active{cursor:grabbing;}
+.beheer-pijlen{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
+.pijl-knop{width:26px;height:18px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--rule);border-radius:3px;font-size:0.65rem;cursor:pointer;color:var(--mid);transition:background 0.1s;}
+.pijl-knop:active{background:var(--rule);}
+.beheer-item.dragover{border-top:2px solid var(--ink);}
 .invoer-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
 .invoer-veld{display:flex;flex-direction:column;gap:3px;}
 .invoer-veld label{font-size:0.65rem;color:var(--mid);font-family:'IBM Plex Mono',monospace;}
@@ -307,8 +313,7 @@ function laadState(){const s=opslagLees('kb3_state');if(s){try{return JSON.parse
 function slaState(s){opslagSchrijf('kb3_state',JSON.stringify(s));}
 let coordCache={};try{coordCache=JSON.parse(opslagLees('kb3_coords')||'{}');}catch(e){}
 function slaCoords(){opslagSchrijf('kb3_coords',JSON.stringify(coordCache));}
-let extra=[];try{extra=JSON.parse(opslagLees('kb3_extra')||'[]');}catch(e){}
-function slaExtra(){opslagSchrijf('kb3_extra',JSON.stringify(extra));}
+let extra=[];try{extra=JSON.parse(opslagLees('kb3_extra')||'[]');}catch(e){} function slaExtra(){opslagSchrijf('kb3_extra',JSON.stringify(extra));} let volgordeOverride=null;try{volgordeOverride=JSON.parse(opslagLees('kb3_volgorde')||'null');}catch(e){} function slaVolgorde(){opslagSchrijf('kb3_volgorde',JSON.stringify(volgordeOverride));}
 function dagVandag(){const d=new Date().getDay();return(d===0||d===6)?'weekend':'weekdag';}
 let state=laadState();
 if(!state.huidigeDag)state.huidigeDag=dagVandag();
@@ -318,7 +323,7 @@ function setDag(dag){
   document.getElementById('knop-weekend').classList.toggle('actief',dag==='weekend');
   tekenTelbalk();tekenRoute();if(actievTab==='invoer')tekenInvoer();
 }
-function alleAdressen(){return[...ADRESSEN_STANDAARD,...extra].map(a=>({...a,done:!!state.bezorgd[a.id],lat:coordCache[a.postcode+a.nr]?.lat||null,lng:coordCache[a.postcode+a.nr]?.lng||null}));}
+function alleAdressen(){let basis=[...ADRESSEN_STANDAARD,...extra].map(a=>({...a,done:!!state.bezorgd[a.id],lat:coordCache[a.postcode+a.nr]?.lat||null,lng:coordCache[a.postcode+a.nr]?.lng||null}));if(volgordeOverride){const map=Object.fromEntries(basis.map(a=>[a.id,a]));const gesorteerd=volgordeOverride.map(id=>map[id]).filter(Boolean);const overig=basis.filter(a=>!volgordeOverride.includes(a.id));basis=[...gesorteerd,...overig];}return basis;}
 function huidigeLijst(){return alleAdressen().filter(a=>a.dag===state.huidigeDag);}
 let gpsLat=null,gpsLng=null;
 function startGPS(){
@@ -404,6 +409,28 @@ function aantalWijzig(code,delta){const inp=document.getElementById('inp-'+code)
 function slaInvoerOp(){KRANTEN_DEF.forEach(k=>{const i=document.getElementById('inp-'+k.code);if(i)state.aantalPerKrant[k.code]=Math.max(0,parseInt(i.value)||0);});state.invoerGedaan=true;slaState(state);toonMelding('invoer-melding','ok','✓ Opgeslagen — ga naar Route!');tekenTelbalk();}
 function resetRonde(){if(!confirm('Ronde resetten?'))return;state.bezorgd={};state.invoerGedaan=false;state.aantalPerKrant={};slaState(state);filterKrant=null;tekenTelbalk();tekenRoute();tekenInvoer();tekenGpsBalk();}
 function toonMelding(id,type,txt){const el=document.getElementById(id);el.className='melding '+type;el.textContent=txt;setTimeout(()=>el.className='melding',3500);}
+function verplaatsAdres(id,richting){
+  const alle=alleAdressen(),dagLijst=alle.filter(a=>a.dag===state.huidigeDag),idx=dagLijst.findIndex(a=>a.id===id);
+  if(idx===-1)return;const nieuweIdx=idx+richting;if(nieuweIdx<0||nieuweIdx>=dagLijst.length)return;
+  [dagLijst[idx],dagLijst[nieuweIdx]]=[dagLijst[nieuweIdx],dagLijst[idx]];
+  const andereDag=alle.filter(a=>a.dag!==state.huidigeDag);
+  volgordeOverride=[...andereDag,...dagLijst].map(a=>a.id);slaVolgorde();tekenBeheer();tekenRoute();
+}
+let dragSrcId=null;
+function dragStart(e,id){dragSrcId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('dragover');return false;}
+function dragLeave(e){e.currentTarget.classList.remove('dragover');}
+function dragDrop(e,targetId){
+  e.stopPropagation();e.currentTarget.classList.remove('dragover');if(dragSrcId===targetId)return;
+  const alle=alleAdressen(),dagLijst=alle.filter(a=>a.dag===state.huidigeDag);
+  const srcIdx=dagLijst.findIndex(a=>a.id===dragSrcId),tgtIdx=dagLijst.findIndex(a=>a.id===targetId);
+  if(srcIdx===-1||tgtIdx===-1)return;
+  const [v]=dagLijst.splice(srcIdx,1);dagLijst.splice(tgtIdx,0,v);
+  const andereDag=alle.filter(a=>a.dag!==state.huidigeDag);
+  volgordeOverride=[...andereDag,...dagLijst].map(a=>a.id);slaVolgorde();
+  document.querySelectorAll('.beheer-item').forEach(el=>el.style.opacity='1');
+  tekenBeheer();tekenRoute();return false;
+}
 function tekenBeheer(){
   const alle=alleAdressen(),wd=alle.filter(a=>a.dag==='weekdag'),we=alle.filter(a=>a.dag==='weekend');
   document.getElementById('tel-weekdag').textContent=wd.length;
@@ -411,7 +438,16 @@ function tekenBeheer(){
   [['beheer-weekdag',wd],['beheer-weekend',we]].forEach(([id,lijst])=>{
     const ct=document.getElementById(id);
     if(!lijst.length){ct.innerHTML='<div style="color:var(--mid);font-size:0.75rem;padding:8px 0">Geen adressen.</div>';return;}
-    ct.innerHTML=lijst.map(a=>{const kd=krantDef(a.krant),isExtra=extra.find(e=>e.id===a.id);return '<div class="beheer-item"><div class="krant-kleur-blok" style="background:'+kd.kleur+';width:8px;height:36px;border-radius:2px;flex-shrink:0"></div><div class="beheer-item-info"><div class="beheer-item-adres">'+a.straat+' '+a.nr+'</div><div class="beheer-item-meta">'+a.postcode+' · '+kd.naam+(a.notitie?' · 📌':'')+'</div></div>'+(isExtra?'<button class="beheer-verwijder" onclick="verwijderAdres(\''+a.id+'\')">✕</button>':'<span style="width:36px"></span>')+'</div>';}).join('');
+    ct.innerHTML=lijst.map((a,i)=>{
+      const kd=krantDef(a.krant),isExtra=extra.find(e=>e.id===a.id);
+      return '<div class="beheer-item" id="bi-'+a.id+'" draggable="true" ondragstart="dragStart(event,\''+a.id+'\')" ondragover="dragOver(event)" ondrop="dragDrop(event,\''+a.id+'\')" ondragleave="dragLeave(event)">'+
+        '<span class="beheer-greep" title="Slepen">⠿</span>'+
+        '<div class="krant-kleur-blok" style="background:'+kd.kleur+';width:8px;height:36px;border-radius:2px;flex-shrink:0"></div>'+
+        '<div class="beheer-item-info"><div class="beheer-item-adres">'+a.straat+' '+a.nr+'</div><div class="beheer-item-meta">'+a.postcode+' · '+kd.naam+(a.notitie?' · 📌':'')+'</div></div>'+
+        '<div class="beheer-pijlen"><button class="pijl-knop" onclick="verplaatsAdres(\''+a.id+'\','+(-1)+')">▲</button><button class="pijl-knop" onclick="verplaatsAdres(\''+a.id+'\','+1+')">▼</button></div>'+
+        (isExtra?'<button class="beheer-verwijder" onclick="verwijderAdres(\''+a.id+'\')">✕</button>':'<span style="width:30px"></span>')+
+      '</div>';
+    }).join('');
   });
 }
 function voegAdresToe(){
