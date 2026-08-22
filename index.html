@@ -324,7 +324,7 @@ function setDag(dag){
   tekenTelbalk();tekenRoute();if(actievTab==='invoer')tekenInvoer();
 }
 function alleAdressen(){let basis=[...ADRESSEN_STANDAARD,...extra].map(a=>({...a,done:!!state.bezorgd[a.id],lat:coordCache[a.postcode+a.nr]?.lat||null,lng:coordCache[a.postcode+a.nr]?.lng||null}));if(volgordeOverride){const map=Object.fromEntries(basis.map(a=>[a.id,a]));const gesorteerd=volgordeOverride.map(id=>map[id]).filter(Boolean);const overig=basis.filter(a=>!volgordeOverride.includes(a.id));basis=[...gesorteerd,...overig];}return basis;}
-function huidigeLijst(){return alleAdressen().filter(a=>a.dag===state.huidigeDag);}
+function huidigeLijst(){const alle=alleAdressen();if(state.huidigeDag==='weekend')return alle.filter(a=>a.dag==='weekdag'||a.dag==='weekend');return alle.filter(a=>a.dag==='weekdag');}
 let gpsLat=null,gpsLng=null;
 function startGPS(){
   if(!navigator.geolocation){gpsStatus('err','Geen GPS');return;}
